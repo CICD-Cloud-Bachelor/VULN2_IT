@@ -1,0 +1,58 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  phpVersion: '7.4'
+  nodeVersion: '14.x'
+
+steps:
+- script: |
+    echo 'Installing PHP and required extensions...'
+    sudo apt-get update
+    sudo apt-get install -y php$phpVersion php$phpVersion-xml php$phpVersion-mbstring php$phpVersion-curl
+    echo 'Installing Composer...'
+    curl -sS https://getcomposer.org/installer | php
+    sudo mv composer.phar /usr/local/bin/composer
+  displayName: 'Install PHP and Composer'
+
+- script: |
+    echo 'Installing Node.js...'
+    curl -sL https://deb.nodesource.com/setup_$nodeVersion | sudo -E bash -
+    sudo apt-get install -y nodejs
+    echo 'Installing npm dependencies...'
+    npm install
+  displayName: 'Install Node.js and NPM'
+
+- script: |
+    echo 'Running PHP lint...'
+    find . -name '*.php' -exec php -l {} \;
+  displayName: 'Lint PHP Files'
+
+- script: |
+    echo 'Running PHPUnit tests...'
+    composer install --no-interaction --prefer-dist
+    vendor/bin/phpunit
+  displayName: 'Run PHPUnit Tests'
+
+- script: |
+    echo 'Building JavaScript and CSS...'
+    npm run build
+  displayName: 'Build Frontend Assets'
+
+- script: |
+    echo 'Deploying to Staging Environment...'
+    # Assuming you have a staging server setup with SSH
+    # Replace the paths and server details accordingly
+    scp -r ./dist/ username@staging-server:/var/www/html/ticket-system
+    ssh username@staging-server 'cd /var/www/html/ticket-system && composer install --no-dev && npm install --production'
+  displayName: 'Deploy to Staging'
+
+- script: |
+    echo 'Cleanup post build...'
+    rm -rf node_modules
+    rm -rf vendor
+  displayName: 'Post-build Cleanup'
+
